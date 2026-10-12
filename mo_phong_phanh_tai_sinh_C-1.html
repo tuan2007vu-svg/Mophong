@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mô phỏng phanh tái sinh - Trực quan và kỹ thuật</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#18243a;background:#eef3f9}
+*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(120deg,#102644,#1769a8);color:white;padding:22px 16px}
+header h1{font-size:1.35rem;line-height:1.3;margin:0 0 7px}header p{margin:0;color:#dcecff;font-size:.9rem}
+main{max-width:1050px;margin:auto;padding:13px}.card{background:white;border-radius:14px;padding:15px;margin-bottom:13px;box-shadow:0 3px 15px #152b4610}
+h2{font-size:1.05rem;color:#15385f;margin:0 0 13px}.sub{font-size:.87rem;color:#5a6980;line-height:1.5}
+label{display:flex;justify-content:space-between;gap:8px;font-size:.9rem;font-weight:650;margin:14px 0 5px}input{width:100%;accent-color:#1376cb}
+button{border:0;border-radius:10px;background:#146fc1;color:white;font-weight:750;padding:13px;width:100%;margin-top:13px;font-size:.98rem}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.metric{background:#eff6ff;border-radius:10px;padding:11px}.metric span{display:block;color:#566981;font-size:.78rem}.metric strong{display:block;color:#104f8c;font-size:1.13rem;margin-top:5px}
+.grid{display:grid;grid-template-columns:1fr;gap:12px}.two{display:grid;grid-template-columns:1fr;gap:12px}
+canvas{width:100%;height:225px;display:block}.visual{background:linear-gradient(#f7fbff,#e9f3ff);border-radius:12px;padding:8px}
+svg{width:100%;height:auto;display:block}.node{fill:#fff;stroke:#9db8d6;stroke-width:1.5}.ntext{font-size:12px;fill:#1d3858;font-weight:650}.wire{stroke:#1475c8;stroke-width:4;fill:none;stroke-linecap:round;stroke-linejoin:round}.flowdot{fill:#13a6ff;filter:drop-shadow(0 0 3px #6dcaff)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td{padding:8px 3px;border-bottom:1px solid #e8edf4}td:last-child{text-align:right;font-weight:650}
+.btn2{background:#16805d}.tag{display:inline-block;background:#e0f2ff;color:#11548a;border-radius:999px;padding:4px 9px;font-size:.78rem;font-weight:700;margin-bottom:8px}
+@media(min-width:760px){header h1{font-size:1.7rem}.grid{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header><h1>Mô phỏng hệ thống phanh tái sinh năng lượng</h1><p>Mô hình trực quan kết hợp thông số kỹ thuật và biểu đồ • Tối ưu cho điện thoại</p></header>
+<main>
+<section class="card">
+<span class="tag">BẢNG ĐIỀU KHIỂN</span><h2>1. Thông số đầu vào</h2>
+<label>Khối lượng xe <span id="mv">1.500 kg</span></label><input id="m" type="range" min="500" max="3000" step="50" value="1500">
+<label>Vận tốc ban đầu <span id="vv">60 km/h</span></label><input id="v0" type="range" min="10" max="120" step="5" value="60">
+<label>Thời gian phanh <span id="tv">5,0 s</span></label><input id="T" type="range" min="1" max="12" step=".5" value="5">
+<label>Tỷ lệ phanh cơ học nhánh tái sinh tiếp nhận <span id="sv">65%</span></label><input id="share" type="range" min="0" max="100" step="5" value="65">
+<label>Hiệu suất chuyển đổi sang điện nạp pin <span id="ev">90%</span></label><input id="eta" type="range" min="10" max="100" step="5" value="90">
+<button id="brake">BẮT ĐẦU PHANH</button><p class="sub">Thay đổi thông số rồi nhấn nút để chạy lại hoạt ảnh và cập nhật kết quả.</p>
+</section>
+
+<section class="card"><h2>2. Hoạt ảnh nguyên lý thu hồi năng lượng</h2>
+<div class="visual">
+<svg viewBox="0 0 720 285" role="img" aria-label="Xe điện, động cơ máy phát và pin">
+  <defs><linearGradient id="carPaint" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#54a9f0"/><stop offset="1" stop-color="#1769a8"/></linearGradient></defs>
+  <path d="M18 218 H702" stroke="#b5c6d9" stroke-width="3" stroke-dasharray="10 8"/>
+  <g id="car" transform="translate(20,0)">
+    <path d="M40 174 L62 137 Q70 124 91 124 H169 Q187 126 203 149 L224 165 L230 188 H34 Z" fill="url(#carPaint)" stroke="#14558d" stroke-width="2"/>
+    <path d="M80 136 H122 V159 H62 Z M132 136 H165 Q178 138 190 159 H132 Z" fill="#d8efff" stroke="#4d8fbd"/>
+    <rect x="52" y="166" width="157" height="12" rx="5" fill="#123b63"/>
+    <circle cx="76" cy="190" r="22" fill="#243447"/><circle cx="76" cy="190" r="10" fill="#cbd7e4"/><circle cx="190" cy="190" r="22" fill="#243447"/><circle cx="190" cy="190" r="10" fill="#cbd7e4"/>
+    <text x="130" y="112" text-anchor="middle" font-size="13" fill="#1d3858" font-weight="700">XE ĐIỆN</text>
+  </g>
+  <g transform="translate(285,55)">
+    <rect class="node" x="0" y="28" width="116" height="88" rx="12"/>
+    <circle cx="58" cy="61" r="23" fill="#e5f4ff" stroke="#227ab7" stroke-width="3"/>
+    <path d="M47 61 q11 -18 22 0 q-11 18 -22 0" fill="none" stroke="#227ab7" stroke-width="3"/>
+    <text class="ntext" x="58" y="99" text-anchor="middle">Động cơ /</text><text class="ntext" x="58" y="112" text-anchor="middle">máy phát</text>
+  </g>
+  <path class="wire" d="M245 162 H280"/><path class="wire" d="M405 139 H444"/>
+  <g transform="translate(445,75)">
+    <rect class="node" x="0" y="15" width="96" height="70" rx="10"/>
+    <path d="M24 34 H72 M24 47 H72 M24 60 H58" stroke="#1c75b8" stroke-width="4" stroke-linecap="round"/>
+    <text class="ntext" x="48" y="103" text-anchor="middle">Bộ biến đổi</text>
+  </g>
+  <path class="wire" d="M545 139 H582"/>
+  <g transform="translate(583,78)">
+    <rect x="0" y="15" width="91" height="65" rx="8" fill="#e0f7eb" stroke="#1c9564" stroke-width="2"/>
+    <rect x="91" y="34" width="7" height="26" rx="2" fill="#1c9564"/>
+    <rect x="12" y="27" width="14" height="41" rx="2" fill="#43bd88"/><rect x="31" y="27" width="14" height="41" rx="2" fill="#43bd88"/><rect x="50" y="27" width="14" height="41" rx="2" fill="#43bd88"/>
+    <text class="ntext" x="45" y="100" text-anchor="middle">Pin</text>
+  </g>
+  <g id="dots"><circle class="flowdot" cx="257" cy="162" r="5"/><circle class="flowdot" cx="420" cy="139" r="5"/><circle class="flowdot" cx="561" cy="139" r="5"/></g>
+  <text x="365" y="245" text-anchor="middle" font-size="13" fill="#31526f" id="state">Sẵn sàng mô phỏng</text>
+</svg>
+</div>
+<p class="sub">Khi phanh, bánh xe truyền năng lượng cơ học qua hệ truyền động tới động cơ hoạt động như máy phát. Bộ biến đổi điều chỉnh điện năng trước khi pin tiếp nhận, trong giới hạn cho phép.</p>
+</section>
+
+<section class="card"><h2>3. Chỉ số kết quả</h2><div class="metrics">
+<div class="metric"><span>Động năng ban đầu</span><strong id="k0">208,3 kJ</strong></div>
+<div class="metric"><span>Điện năng ước tính về pin</span><strong id="eb">121,9 kJ</strong></div>
+<div class="metric"><span>Tỷ lệ động năng về pin</span><strong id="pct">58,5%</strong></div>
+<div class="metric"><span>Quãng đường phanh</span><strong id="dist">41,7 m</strong></div>
+</div></section>
+
+<div class="grid">
+<section class="card"><h2>4. Vận tốc theo thời gian</h2><canvas id="speedChart" height="225"></canvas></section>
+<section class="card"><h2>5. Công suất phanh và điện vào pin</h2><canvas id="powerChart" height="225"></canvas></section>
+<section class="card"><h2>6. Năng lượng thu hồi tích lũy</h2><canvas id="energyChart" height="225"></canvas></section>
+<section class="card"><h2>7. Cân bằng năng lượng ước tính</h2><canvas id="balanceChart" height="225"></canvas></section>
+</div>
+
+<section class="card"><h2>8. Bảng kết quả chi tiết</h2><table><tbody>
+<tr><td>Khối lượng xe</td><td id="tm">1.500 kg</td></tr><tr><td>Vận tốc ban đầu</td><td id="ts">60 km/h</td></tr>
+<tr><td>Thời gian phanh</td><td id="tt">5,0 s</td></tr><tr><td>Gia tốc chậm dần</td><td id="ta">3,333 m/s²</td></tr>
+<tr><td>Động năng ban đầu</td><td id="tk">208,33 kJ</td></tr><tr><td>Năng lượng cơ học vào nhánh tái sinh</td><td id="tme">135,42 kJ</td></tr>
+<tr><td>Điện năng ước tính về pin</td><td id="teb">121,88 kJ</td></tr><tr><td>Năng lượng không về pin</td><td id="tl">86,46 kJ</td></tr>
+</tbody></table><button class="btn2" id="csv">TẢI DỮ LIỆU CSV</button></section>
+<section class="card"><h2>9. Giả định và giới hạn mô hình</h2><p class="sub">Xe được giả định giảm tốc đều; tỷ lệ phanh tái sinh và hiệu suất chuyển đổi là hằng số. Chưa mô phỏng chi tiết bản đồ động cơ, bộ biến đổi công suất, giới hạn sạc/SOC pin, lực cản, độ bám lốp hoặc phối hợp phanh ma sát. Kết quả là ước tính minh họa, không phải dữ liệu đo trên xe thật.</p></section>
+</main>
+<script>
+const $=id=>document.getElementById(id),fmt=(x,d=1)=>Number(x).toLocaleString('vi-VN',{minimumFractionDigits:d,maximumFractionDigits:d});
+let S={};
+function labels(){ $('mv').textContent=fmt(+$('m').value,0)+' kg';$('vv').textContent=fmt(+$('v0').value,0)+' km/h';$('tv').textContent=fmt(+$('T').value,1)+' s';$('sv').textContent=$('share').value+'%';$('ev').textContent=$('eta').value+'%';}
+['m','v0','T','share','eta'].forEach(id=>$(id).addEventListener('input',labels));
+function canvas(id){let c=$(id),w=c.getBoundingClientRect().width||320,h=225,d=window.devicePixelRatio||1;c.width=w*d;c.height=h*d;let x=c.getContext('2d');x.scale(d,d);return {x,w,h};}
+function lineChart(id,series,t,xlabel,ylabel){let {x,w,h}=canvas(id),L=43,R=9,U=22,B=34,pw=w-L-R,ph=h-U-B; x.clearRect(0,0,w,h);let max=Math.max(1,...series.flatMap(s=>s.y))*1.12;x.font='10px system-ui';x.strokeStyle='#dbe4ef';x.fillStyle='#52627b';
+for(let j=0;j<=4;j++){let y=U+ph*j/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText(fmt(max*(1-j/4),0),2,y+3)}
+for(let j=0;j<=4;j++){let xx=L+pw*j/4;x.beginPath();x.moveTo(xx,U);x.lineTo(xx,U+ph);x.stroke();x.fillText(fmt(t[t.length-1]*j/4,1),xx-8,h-18)}
+let colors=['#1674c8','#e07c2c'];series.forEach((s,k)=>{x.strokeStyle=colors[k%2];x.lineWidth=2;x.beginPath();s.y.forEach((v,i)=>{let xx=L+pw*i/(s.y.length-1),yy=U+ph*(1-v/max);i?x.lineTo(xx,yy):x.moveTo(xx,yy)});x.stroke()});
+x.fillStyle='#263d58';x.textAlign='center';x.fillText(xlabel,L+pw/2,h-2);x.save();x.translate(11,U+ph/2);x.rotate(-Math.PI/2);x.fillText(ylabel,0,0);x.restore();x.textAlign='left';let lx=L;series.forEach((s,k)=>{x.fillStyle=colors[k%2];x.fillRect(lx,U-12,9,3);x.fillStyle='#334963';x.fillText(s.name,lx+12,U-8);lx+=Math.min(150,x.measureText(s.name).width+35)})}
+function bars(id,labels,vals){let {x,w,h}=canvas(id),L=35,R=8,U=20,B=42,pw=w-L-R,ph=h-U-B,max=Math.max(...vals,1)*1.15;x.clearRect(0,0,w,h);x.font='10px system-ui';x.strokeStyle='#dbe4ef';x.fillStyle='#52627b';for(let j=0;j<=4;j++){let y=U+ph*j/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText(fmt(max*(1-j/4),0),1,y+3)}let gap=12,bw=(pw-gap*(vals.length+1))/vals.length;vals.forEach((v,i)=>{let xx=L+gap+(bw+gap)*i,hh=v/max*ph;x.fillStyle=['#1674c8','#14845c','#aeb9c8'][i];x.fillRect(xx,U+ph-hh,bw,hh);x.fillStyle='#34445c';x.textAlign='center';x.fillText(fmt(v,1),xx+bw/2,U+ph-hh-4);x.fillText(labels[i],xx+bw/2,h-24)})}
+function sim(animate=false){let m=+$('m').value,kmh=+$('v0').value,v0=kmh/3.6,T=+$('T').value,share=+$('share').value/100,eta=+$('eta').value/100,n=501,dt=T/(n-1),a=v0/T;
+let t=[],v=[],pb=[],pin=[],eb=[],ek=[],E=0;
+for(let i=0;i<n;i++){let ti=i*dt,vi=Math.max(v0-a*ti,0),p=m*a*vi,pi=p*share*eta;if(i)E+=(pin[i-1]+pi)*.5*dt;t.push(ti);v.push(vi*3.6);pb.push(p);pin.push(pi);eb.push(E);ek.push(.5*m*vi*vi)}
+let E0=.5*m*v0*v0,Emech=share*E0,Ebat=E0*share*eta,dist=v0*T/2;
+S={t,v,pb,pin,eb,ek,m,kmh,T,E0,Emech,Ebat,dist,share,eta,a};
+$('k0').textContent=fmt(E0/1000,1)+' kJ';$('eb').textContent=fmt(Ebat/1000,1)+' kJ';$('pct').textContent=fmt(E0?Ebat/E0*100:0,1)+'%';$('dist').textContent=fmt(dist,1)+' m';
+$('tm').textContent=fmt(m,0)+' kg';$('ts').textContent=fmt(kmh,0)+' km/h';$('tt').textContent=fmt(T,1)+' s';$('ta').textContent=fmt(a,3)+' m/s²';$('tk').textContent=fmt(E0/1000,2)+' kJ';$('tme').textContent=fmt(Emech/1000,2)+' kJ';$('teb').textContent=fmt(Ebat/1000,2)+' kJ';$('tl').textContent=fmt((E0-Ebat)/1000,2)+' kJ';
+lineChart('speedChart',[{name:'Vận tốc',y:v}],t,'Thời gian (s)','km/h');
+lineChart('powerChart',[{name:'Phanh cơ học',y:pb.map(z=>z/1000)},{name:'Điện vào pin',y:pin.map(z=>z/1000)}],t,'Thời gian (s)','kW');
+lineChart('energyChart',[{name:'Năng lượng tích lũy',y:eb.map(z=>z/1000)}],t,'Thời gian (s)','kJ');
+bars('balanceChart',['Động năng đầu','Điện về pin','Không về pin'],[E0/1000,Ebat/1000,(E0-Ebat)/1000]);
+if(animate){let start=performance.now(),duration=2400;function frame(now){let f=Math.min((now-start)/duration,1),carX=20+f*100;$('car').setAttribute('transform',`translate(${carX},0)`);$('state').textContent=f<1?'Đang phanh • năng lượng được thu hồi về pin':'Đã dừng • hoàn tất mô phỏng';document.querySelectorAll('#dots circle').forEach((c,i)=>{c.setAttribute('cx',[257,420,561][i]+(f*22%22))});if(f<1)requestAnimationFrame(frame)}requestAnimationFrame(frame)}
+}
+$('brake').addEventListener('click',()=>sim(true));
+$('csv').addEventListener('click',()=>{let rows=[['time_s','speed_kmh','kinetic_energy_kJ','mechanical_braking_power_kW','battery_charging_power_kW','recovered_energy_kJ']];S.t.forEach((t,i)=>rows.push([t,S.v[i],S.ek[i]/1000,S.pb[i]/1000,S.pin[i]/1000,S.eb[i]/1000]));let blob=new Blob(['\uFEFF'+rows.map(r=>r.join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ket_qua_phanh_tai_sinh.csv';a.click();URL.revokeObjectURL(url)});
+window.addEventListener('resize',()=>sim(false));labels();sim(false);
+</script>
+</body></html>
